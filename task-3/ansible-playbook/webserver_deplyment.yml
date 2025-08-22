@@ -1,0 +1,52 @@
+---
+- name: Deploy Nginx web server
+  hosts: web
+  become: yes
+  gather_facts: yes
+  vars:
+    web_content: |
+      <!doctype html>
+      <html>
+        <head><title>Welcome</title></head>
+        <body>
+          <h1>Deployed via Ansible</h1>
+        </body>
+      </html>
+
+  tasks:
+    - name: Install Nginx on Debian/Ubuntu
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Nginx on RHEL/CentOS/Amazon
+      ansible.builtin.yum:
+        name: nginx
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure Nginx enabled and running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Deploy index.html (Debian/Ubuntu default path)
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        content: "{{ web_content }}"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+      when: ansible_os_family == "Debian"
+
+    - name: Deploy index.html (RHEL/CentOS/Amazon default path)
+      ansible.builtin.copy:
+        dest: /usr/share/nginx/html/index.html
+        content: "{{ web_content }}"
+        owner: nginx
+        group: nginx
+        mode: "0644"
+      when: ansible_os_family == "RedHat"

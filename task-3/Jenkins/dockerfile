@@ -1,0 +1,20 @@
+#Trusted and Authorized based images
+FROM python:3.12-slim 
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/* 
+
+# adding a non-root user 
+RUN useradd -m appuser 
+
+# Run as Non-Root User
+USER appuser	
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=appuser:appuser . .
+
+# Keep Secrets out of Images and pass through the cli arguments
+ENV PYTHONUNBUFFERED=1 APP_ENV=production 
+
+# Network Security & Isolation
+EXPOSE 8080 
+CMD ["python", "app.py"]

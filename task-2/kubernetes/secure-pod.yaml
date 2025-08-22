@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-pod
+  labels:
+    app: myapp
+spec:
+  securityContext:
+    runAsNonRoot: true        # Enforce non-root user
+    runAsUser: 1000           # UID for appuser (from Dockerfile)
+    fsGroup: 2000             # Group ownership for mounted volumes
+  containers:
+    - name: myapp-secure
+      image: myapp:secure     # Docker image built earlier
+      securityContext:
+        allowPrivilegeEscalation: false   # Prevent privilege escalation
+        readOnlyRootFilesystem: true      # readonly privilege for root filesystem
+        capabilities:
+          drop:
+            - ALL             # Drop all Linux capabilities
+      ports:
+        - containerPort: 8080 # Expose application port to custom port number
+      resources:
+        limits:
+          memory: "256Mi"
+          cpu: "500m"

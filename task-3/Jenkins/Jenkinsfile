@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        SSH_CREDENTIALS = credentials('ssh_creds')
+        IMAGE_NAME = "shahab/tek-challenge"
+        IMAGE_TAG  = "secure"
+        EC2_HOST   = "172.17.00.00"
+        APP_NAME   = "tek-challenge"
+        APP_PORT   = "8000"
+    }
+
+    options {
+        skipDefaultCheckout(true)
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/shahab/tek-challenge.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('', 'dockerhub-creds') {
+                        sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'echo "Running unit tests..."'
+                sh 'pytest || true'
+            }
+        }
+
+        stage('Security Scan with Trivy') {
+            steps {
+                sh "trivy image --exit-code 0 --severity HIGH,CRITICAL ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry("https://index.docker.io/v1/", 'dockerhub-creds') {
+                        sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to EC2') {
+            steps {
+                sshagent(credentials: ['ssh_creds']) {
+                    sh """
+                    docker pull ${IMAGE_NAME}:${IMAGE_TAG} &&
+                    docker stop ${APP_NAME} || true &&
+                    docker rm ${APP_NAME} || true &&
+                    docker run -d --name ${APP_NAME} -p ${APP_PORT}:80 ${IMAGE_NAME}:${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+    }
+}
